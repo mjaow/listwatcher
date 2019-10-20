@@ -1,4 +1,4 @@
-package listwatcher
+package controller
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/embed"
-	"github.com/mjaow/listwatcher/controller"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -95,7 +94,7 @@ func TestInformer(t *testing.T) {
 
 	cluster := "testcluster"
 
-	store, rm := controller.NewInformer(NewTestStudentListWatch(cli, cluster, timeout), deserializeTestStudenFunc, time.Second*3, testStudentDeletionHandlingKeyFuncKeyFuncs, testStudentKeyFuncs, cache.ResourceEventHandlerFuncs{
+	store, rm := NewInformer(NewTestStudentListWatch(cli, cluster, timeout), deserializeTestStudenFunc, time.Second*3, testStudentDeletionHandlingKeyFuncKeyFuncs, testStudentKeyFuncs, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -130,7 +129,7 @@ func TestInformer(t *testing.T) {
 
 	go rm.Run(stopCh)
 
-	if !controller.WaitForCacheSync(stopCh, rm.HasSynced) {
+	if !WaitForCacheSync(stopCh, rm.HasSynced) {
 		t.Fatalf("timed out waiting for caches to sync")
 		return
 	}
