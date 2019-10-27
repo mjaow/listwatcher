@@ -13,6 +13,8 @@ import (
 	"github.com/coreos/etcd/mvcc/mvccpb"
 )
 
+var neverExitWatch <-chan time.Time = make(chan time.Time)
+
 type Reflector struct {
 	listFunc              func() (*clientv3.GetResponse, error)
 	watchFunc             func(ctx context.Context, modVersion int64) clientv3.WatchChan
@@ -65,10 +67,18 @@ func (rm *Reflector) syncWith(kvs []*mvccpb.KeyValue) (int64, error) {
 	return lastRevision + 1, nil
 }
 
-func (rm *Reflector) ListAndWatch(stopCh <-chan struct{}) {
-	ticker := time.NewTicker(rm.resyncPeriod)
+func (rm *Reflector) resyncChan() (<-chan time.Time, func()) {
+	if rm.resyncPeriod <= 0 {
+		return neverExitWatch, func() {}
+	}
+	t := time.NewTicker(rm.resyncPeriod)
+	return t.C, t.Stop
+}
 
-	defer ticker.Stop()
+func (rm *Reflector) ListAndWatch(stopCh <-chan struct{}) {
+	resync, cleanup := rm.resyncChan()
+
+	defer cleanup()
 
 	resp, err := rm.listFunc()
 
@@ -96,7 +106,7 @@ func (rm *Reflector) ListAndWatch(stopCh <-chan struct{}) {
 		select {
 		case <-stopCh:
 			return
-		case <-ticker.C:
+		case <-resync:
 			return
 		case response, open := <-watching:
 			if !open {
