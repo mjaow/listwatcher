@@ -94,30 +94,37 @@ func TestInformer(t *testing.T) {
 
 	cluster := "testcluster"
 
-	store, rm := NewInformer(NewTestStudentListWatch(cli, cluster, timeout), deserializeTestStudenFunc, time.Second*3, testStudentDeletionHandlingKeyFuncKeyFuncs, testStudentKeyFuncs, cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			mu.Lock()
-			defer mu.Unlock()
+	store, rm := NewInformer(
+		NewTestStudentListWatch(cli, cluster, timeout),
+		deserializeTestStudenFunc,
+		time.Second*3,
+		KeyFuncs{
+			KeyFunc:                 testStudentKeyFuncs,
+			DeletionHandlingKeyFunc: testStudentDeletionHandlingKeyFuncKeyFuncs,
+		}, cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				mu.Lock()
+				defer mu.Unlock()
 
-			if k, e := testStudentKeyFuncs(obj); e == nil {
-				op = append(op, "add "+k)
-			}
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			mu.Lock()
-			defer mu.Unlock()
-			if k, e := testStudentKeyFuncs(newObj); e == nil {
-				op = append(op, "update "+k)
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			mu.Lock()
-			defer mu.Unlock()
-			if k, e := testStudentDeletionHandlingKeyFuncKeyFuncs(obj); e == nil {
-				op = append(op, "delete "+k)
-			}
-		},
-	})
+				if k, e := testStudentKeyFuncs(obj); e == nil {
+					op = append(op, "add "+k)
+				}
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				mu.Lock()
+				defer mu.Unlock()
+				if k, e := testStudentKeyFuncs(newObj); e == nil {
+					op = append(op, "update "+k)
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				mu.Lock()
+				defer mu.Unlock()
+				if k, e := testStudentDeletionHandlingKeyFuncKeyFuncs(obj); e == nil {
+					op = append(op, "delete "+k)
+				}
+			},
+		})
 	if err := store.Add(&testStudent{
 		Id:   3,
 		Name: "jack",

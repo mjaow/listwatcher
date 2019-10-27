@@ -17,20 +17,24 @@ type Config struct {
 	reflector    *Reflector
 }
 
+type KeyFuncs struct {
+	KeyFunc                 func(obj interface{}) (string, error)
+	DeletionHandlingKeyFunc func(obj interface{}) (string, error)
+}
+
 type ProcessFunc func(obj interface{}) error
 
 func NewInformer(
 	lw ListWatch,
 	deserializeFunc func(data []byte) (interface{}, error),
 	resyncPeriod time.Duration,
-	deletionHandlingKeyFunc func(obj interface{}) (string, error),
-	keyFunc func(obj interface{}) (string, error),
+	f KeyFuncs,
 	h cache.ResourceEventHandlerFuncs,
 ) (cache.Store, Controller) {
 
-	clientState := cache.NewStore(deletionHandlingKeyFunc)
+	clientState := cache.NewStore(f.DeletionHandlingKeyFunc)
 
-	fifo := cache.NewDeltaFIFO(keyFunc, clientState)
+	fifo := cache.NewDeltaFIFO(f.KeyFunc, clientState)
 
 	cfg := &Config{
 		queue:        fifo,

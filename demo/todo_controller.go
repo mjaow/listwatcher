@@ -86,8 +86,10 @@ func NewTODOManager(etcdCli *clientv3.Client, timeout time.Duration, resyncPerio
 		NewTODOListWatch(etcdCli, timeout),
 		deserializeTODOFunc,
 		resyncPeriod,
-		TODODeletionHandlingKeyFuncKeyFuncs,
-		TODOKeyFuncs,
+		controller.KeyFuncs{
+			KeyFunc:                 TODOKeyFuncs,
+			DeletionHandlingKeyFunc: TODODeletionHandlingKeyFuncKeyFuncs,
+		},
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if k, err := TODOKeyFuncs(obj); err == nil {
