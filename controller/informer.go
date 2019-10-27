@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"context"
+	"github.com/coreos/etcd/clientv3"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
@@ -20,6 +22,12 @@ type Config struct {
 type KeyFuncs struct {
 	KeyFunc                 func(obj interface{}) (string, error)
 	DeletionHandlingKeyFunc func(obj interface{}) (string, error)
+}
+
+type ListWatch interface {
+	Watch(ctx context.Context, modVersion int64) clientv3.WatchChan
+
+	List() (*clientv3.GetResponse, error)
 }
 
 type ProcessFunc func(obj interface{}) error

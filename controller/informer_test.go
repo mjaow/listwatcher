@@ -4,16 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/embed"
-	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/embed"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog"
 )
 
 type testStudent struct {
