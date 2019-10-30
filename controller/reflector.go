@@ -44,11 +44,19 @@ func (rm *Reflector) Run(stopCh <-chan struct{}) {
 	go wait.Until(func() { rm.ListAndWatch(stopCh) }, time.Second, stopCh)
 }
 
+func canIgnore(kv *mvccpb.KeyValue) bool {
+	return kv == nil || kv.Value == nil || string(kv.Value) == "null"
+}
+
 func (rm *Reflector) syncWith(kvs []*mvccpb.KeyValue) (int64, error) {
 	var lastRevision int64
 
 	var items []interface{}
 	for _, kv := range kvs {
+		if canIgnore(kv) {
+			continue
+		}
+
 		rc, err := rm.deserializeFunc(kv.Value)
 
 		if err != nil {
