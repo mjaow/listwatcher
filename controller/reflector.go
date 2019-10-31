@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
@@ -23,16 +24,19 @@ type Reflector struct {
 	store                 cache.Store
 	lastSyncRevision      int64
 	lastSyncRevisionMutex sync.RWMutex
+	keyFuncs              KeyFuncs
 }
 
 func NewReflector(
 	lw ListWatch,
+	k KeyFuncs,
 	deserializeFunc func(data []byte) (interface{}, error),
 	resyncPeriod time.Duration,
 	store cache.Store) *Reflector {
 	return &Reflector{
 		listFunc:         lw.List,
 		watchFunc:        lw.Watch,
+		keyFuncs:         k,
 		deserializeFunc:  deserializeFunc,
 		resyncPeriod:     resyncPeriod,
 		store:            store,
@@ -44,23 +48,24 @@ func (rm *Reflector) Run(stopCh <-chan struct{}) {
 	go wait.Until(func() { rm.ListAndWatch(stopCh) }, time.Second, stopCh)
 }
 
-func canIgnore(kv *mvccpb.KeyValue) bool {
-	return kv == nil || kv.Value == nil || string(kv.Value) == "null"
-}
-
 func (rm *Reflector) syncWith(kvs []*mvccpb.KeyValue) (int64, error) {
 	var lastRevision int64
 
 	var items []interface{}
 	for _, kv := range kvs {
-		if canIgnore(kv) {
-			continue
-		}
-
 		rc, err := rm.deserializeFunc(kv.Value)
 
 		if err != nil {
 			return 0, fmt.Errorf("deserialize key %s value %s failed: %v", string(kv.Key), string(kv.Value), err)
+		}
+
+		if err := rm.checkKey(string(kv.Key), rc); err != nil {
+			if err != KeyConflictErr {
+				return 0, err
+			} else {
+				klog.Errorf("key conflict for key %s and data %v", string(kv.Key), rc)
+				continue
+			}
 		}
 
 		lastRevision = kv.ModRevision
@@ -151,6 +156,22 @@ func (rm *Reflector) LastSyncRevision() int64 {
 	return rm.lastSyncRevision
 }
 
+var KeyConflictErr = errors.New("KeyConflict")
+
+func (rm *Reflector) checkKey(key string, obj interface{}) error {
+	k, err := rm.keyFuncs.KeyFunc(obj)
+
+	if err != nil {
+		return err
+	}
+
+	if k != key {
+		return KeyConflictErr
+	}
+
+	return nil
+}
+
 func (rm *Reflector) watchHandler(event *clientv3.Event) error {
 	if event == nil {
 		return fmt.Errorf("event is nil")
@@ -179,6 +200,15 @@ func (rm *Reflector) watchHandler(event *clientv3.Event) error {
 
 		if err != nil {
 			return err
+		}
+
+		if err := rm.checkKey(string(event.Kv.Key), newData); err != nil {
+			if err != KeyConflictErr {
+				return err
+			} else {
+				klog.Errorf("key conflict for key %s and data %v", string(event.Kv.Key), newData)
+				return nil
+			}
 		}
 
 		if _, exits, err := rm.store.GetByKey(string(event.Kv.Key)); err != nil {

@@ -49,6 +49,7 @@ func NewInformer(
 		retryOnError: false,
 		reflector: NewReflector(
 			lw,
+			f,
 			deserializeFunc,
 			resyncPeriod,
 			fifo,
